@@ -386,7 +386,8 @@ function ilao_legalaid_scorecard_update_content_score($node) {
   $legal_issue_count = 0;
   $update_scheduled = 0;
   $node_last_updated = 0;
-  $effective_time = strtotime("2100-01-01");
+  $effective_time = strtotime("2030-01-01");
+
 
   $ilao_legalaid_scorecard_last_reviewed_date_field = variable_get('ilao_legalaid_scorecard_last_reviewed_date_field', '');
   $ilao_legalaid_scorecard_last_reviewed_date = variable_get('ilao_legalaid_scorecard_last_reviewed_date', '');
@@ -405,6 +406,7 @@ function ilao_legalaid_scorecard_update_content_score($node) {
     if ($ilao_legalaid_scorecard_last_reviewed_date == 1) {
       if (isset($node->{$ilao_legalaid_scorecard_last_reviewed_date_field}[LANGUAGE_NONE][0]['value'])) {
         $changed = $node->{$ilao_legalaid_scorecard_last_reviewed_date_field}[LANGUAGE_NONE][0]['value'];
+        $changed = strtotime($changed);
       }
       else {
         $changed = $node->changed;
@@ -415,10 +417,11 @@ function ilao_legalaid_scorecard_update_content_score($node) {
     }
 
     $after_30 = strtotime("-30 days");
-
     if ($changed < $after_30) {
+
       $node_last_updated = 1;
     }
+
 
     $legal_issue_count = 0;
 
@@ -439,6 +442,7 @@ function ilao_legalaid_scorecard_update_content_score($node) {
 
         // $effective_time = ($effective_time==0)?$effective_date:;.
         if ($effective_date < $effective_time) {
+
           $effective_time = $effective_date;
         }
 
@@ -472,13 +476,13 @@ function ilao_legalaid_scorecard_update_content_score($node) {
         $coverage_value = $legal_taxonomy->field_existing_issue_coverage[LANGUAGE_NONE][0]['value'];
 
         if ($coverage_value == 3) {
-          $coverage_sum += 1;
+          $coverage_sum += 6;
         }
         elseif ($coverage_value == 2) {
           $coverage_sum += 4;
         }
         elseif ($coverage_value == 1) {
-          $coverage_sum += 6;
+          $coverage_sum += 1;
         }
 
         $coverage_arr[$legal_val['tid']] = $coverage_value;
@@ -496,6 +500,7 @@ function ilao_legalaid_scorecard_update_content_score($node) {
     $legal_issue_count = 1;
     $workload_arr = array(0);
   }
+
   $score = ($coverage_sum + $user_impact_sum + $breadth_sum) / $legal_issue_count;
   if (!empty($workload_arr)) {
     $maximum_workload = max($workload_arr);
@@ -503,7 +508,6 @@ function ilao_legalaid_scorecard_update_content_score($node) {
   else {
     $maximum_workload = 0;
   }
-
 
   if ($node_last_updated && $update_scheduled) {
     $current_time = time();
@@ -538,7 +542,7 @@ function ilao_legalaid_scorecard_update_content_score($node) {
   }
   else {
 
-    if ($effective_time == strtotime("2100-01-01") || ($node->changed <= strtotime("+30 days", $effective_time)) && $node->changed >= $effective_time) {
+    if ($effective_time == strtotime("2030-01-01") || ($changed <= strtotime("+30 days", $effective_time)) && $changed >= $effective_time) {
 
       $last_reviewed_date_field = variable_get('ilao_legalaid_scorecard_last_reviewed_date_field', '');
       $last_reviewed_date_flag = variable_get('ilao_legalaid_scorecard_last_reviewed_date', 0);
@@ -628,55 +632,64 @@ function ilao_legalaid_scorecard_update_content_score($node) {
 
   }
 
-  $actual_score = floor($actual_score);
-  $score = floor($score);
+  //$actual_score = floor($actual_score);
+  //$score = floor($score);
+  $score = $actual_score;
+  $actual_score = 33;
+ if (module_exists('fivestar')) {
+   $actual_score = $actual_score + 5;
+ }
+ if (module_exists('google_analytics_reports')) {
+   $actual_score = $actual_score + 5;
+ }
+
 
   // Last Condition for finding content score.
   if ($actual_score <= 43) {
-    if ($score >= 36) {
+    if ($score >= 30) {
       $content_score = 5;
     }
-    elseif ($score >= 26 && $score <= 35) {
+    elseif ($score >= 25 && $score <= 29) {
       $content_score = 4;
+    }
+    elseif ($score >= 21 && $score <= 24) {
+      $content_score = 3;
+    }
+    elseif ($score >= 15 && $score <= 20) {
+      $content_score = 2;
+    }
+    else {
+      $content_score = 1;
+    }
+  }
+  elseif ($actual_score > 33 && $actual_score <= 38) {
+    if ($score >= 34) {
+      $content_score = 5;
+    }
+    elseif ($score >= 30 && $score <= 33) {
+      $content_score = 4;
+    }
+    elseif ($score >= 23 && $score <= 29) {
+      $content_score = 3;
+    }
+    elseif ($score >= 14 && $score <= 22) {
+      $content_score = 2;
+    }
+    else {
+      $content_score = 1;
+    }
+  }
+  elseif ($actual_score > 38) {
+    if ($score >= 38) {
+      $content_score = 5;
+    }
+    elseif ($score >= 32 && $score <= 37) {
+      $content_score = 4;
+    }
+    elseif ($score >= 26 && $score <= 31) {
+      $content_score = 3;
     }
     elseif ($score >= 19 && $score <= 25) {
-      $content_score = 3;
-    }
-    elseif ($score >= 11 && $score <= 18) {
-      $content_score = 2;
-    }
-    else {
-      $content_score = 1;
-    }
-  }
-  elseif ($actual_score > 43 && $actual_score <= 48) {
-    if ($score >= 44) {
-      $content_score = 5;
-    }
-    elseif ($score >= 34 && $score <= 43) {
-      $content_score = 4;
-    }
-    elseif ($score >= 24 && $score <= 33) {
-      $content_score = 3;
-    }
-    elseif ($score >= 11 && $score <= 24) {
-      $content_score = 2;
-    }
-    else {
-      $content_score = 1;
-    }
-  }
-  elseif ($actual_score > 48 && $actual_score <= 53) {
-    if ($score >= 49) {
-      $content_score = 5;
-    }
-    elseif ($score >= 39 && $score <= 48) {
-      $content_score = 4;
-    }
-    elseif ($score >= 29 && $score <= 38) {
-      $content_score = 3;
-    }
-    elseif ($score >= 15 && $score <= 28) {
       $content_score = 2;
     }
     else {
