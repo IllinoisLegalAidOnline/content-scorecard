@@ -1,0 +1,724 @@
+<?php
+
+/**
+ * @file
+ */
+
+/**
+ * Implements hook_views_api().
+ */
+function ilao_legalaid_scorecard_views_api($module = NULL, $api = NULL) {
+  return array("api" => "3.0");
+}
+
+/**
+ * Implements hook_menu().
+ */
+function ilao_legalaid_scorecard_menu() {
+  $items = array();
+
+  $items['admin/config/ilao-scorecard'] = array(
+    'title' => t('Legal aid content scorecard configurations'),
+    'description' => t('Legal aid content scorecard configuration'),
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'position' => 'right',
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+
+  $items['admin/config/ilao-scorecard/legal-aid-content-scorecard'] = array(
+    'title' => t('Legal aid content scorecard settings'),
+    'description' => t('Configure your legal aid content scorecard settings'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ilao_legalaid_scorecard_settings_form'),
+    'access arguments' => array('administer legal aid content scorecard'),
+    'file' => 'ilao_legalaid_scorecard.admin.inc',
+    'file path' => drupal_get_path('module', 'ilao_legalaid_scorecard'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function ilao_legalaid_scorecard_permission() {
+  $module_perms = array();
+
+  $module_perms['administer legal aid content scorecard'] = array(
+    'title' => t('Administer Legal aid content scorecard'),
+    'restrict access' => TRUE,
+  );
+  $module_perms['view legal aid content scorecard'] = array(
+    'title' => t('View Legal aid content scorecard'),
+  );
+
+  return $module_perms;
+}
+
+/**
+ * Helper function to provide options for checkboxes, select list etc for
+ * different entity types.
+ */
+function _ilao_legalaid_scorecard_get_entities_as_options($key, $value, $entity_type) {
+  $entity_types = array();
+
+  switch ($entity_type) {
+    case 'taxonomy_vocabulary':
+      $entity_types = taxonomy_get_vocabularies();
+      break;
+
+    case 'node':
+      $entity_types = node_type_get_types();
+      break;
+  }
+
+  $options = array();
+  foreach ($entity_types as $key1 => $object) {
+    $options[$object->{$key}] = $object->{$value};
+  }
+
+  return $options;
+}
+
+/**
+ * Helper function to create field base for given element if the configuration
+ * is present.
+ */
+function _ilao_legalaid_scorecard_create_field_base($field_name) {
+  $field = array();
+
+  switch ($field_name) {
+    case 'field_legal_issue_breadth':
+      $field = array(
+        'field_name' => 'field_legal_issue_breadth',
+        'type' => 'list_text',
+        'module' => 'list',
+        'settings' => array(
+          'allowed_values' => array(
+            1 => 'Low',
+            2 => 'Moderate',
+            3 => 'High',
+          ),
+        ),
+        'cardinality' => 1,
+      );
+      break;
+
+    case 'field_legal_issue_user_impact':
+      $field = array(
+        'field_name' => 'field_legal_issue_user_impact',
+        'type' => 'list_text',
+        'module' => 'list',
+        'settings' => array(
+          'allowed_values' => array(
+            1 => 'De-elevated',
+            5 => 'Normal',
+            9 => 'Elevated',
+          ),
+        ),
+        'cardinality' => 1,
+      );
+      break;
+
+    case 'field_existing_issue_coverage':
+      $field = array(
+        'field_name' => 'field_existing_issue_coverage',
+        'type' => 'list_text',
+        'module' => 'list',
+        'settings' => array(
+          'allowed_values' => array(
+            1 => 'Limited',
+            2 => 'Average',
+            3 => 'High',
+          ),
+        ),
+        'cardinality' => 1,
+      );
+      break;
+
+    case 'field_effective_date':
+      $field = array(
+        'field_name' => 'field_effective_date',
+        'type' => 'datetime',
+        'module' => 'date',
+        'settings' => array(
+          'granularity ' => array(
+            'month' => 'month',
+            'day' => 'day',
+            'year' => 'year',
+            'hour' => 0,
+            'minute' => 0,
+            'second' => 0,
+          ),
+          'tz_handling' => 'none',
+          'timezone_db' => '',
+          'repeat' => 0,
+          'cache_enabled' => 0,
+          'cache_count' => 4,
+        ),
+        'cardinality' => 1,
+      );
+      break;
+
+    case 'field_workload_impact':
+      $field = array(
+        'field_name' => 'field_workload_impact',
+        'type' => 'list_text',
+        'module' => 'list',
+        'settings' => array(
+          'allowed_values' => array(
+            1 => 'Minor',
+            2 => 'Significant',
+            3 => 'Major',
+          ),
+        ),
+        'cardinality' => 1,
+      );
+      break;
+
+    case 'field_content_score':
+      $field = array(
+        'field_name' => 'field_content_score',
+        'type' => 'text',
+        'module' => 'text',
+        'settings' => array(
+          'max_length' => 255,
+        ),
+        'cardinality' => 1,
+      );
+      break;
+  }
+
+  if (!empty($field)) {
+    field_create_field($field);
+  }
+}
+
+/**
+ * Helper function to create field instance for given field base, bundle and
+ * entity_type if the configuration is present.
+ */
+function _ilao_legalaid_scorecard_create_field_instance($entity_type, $field_name, $bundle) {
+  $field = array();
+
+  switch ($field_name) {
+    case 'field_legal_issue_breadth':
+      $field = array(
+        'field_name' => 'field_legal_issue_breadth',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Breadth of legal issue'),
+        'description' => t('Of our target users, how widespread is this legal issue?'),
+        'widget' => array(
+          'type' => 'options_select',
+          'module' => 'options',
+        ),
+      );
+      break;
+
+    case 'field_legal_issue_user_impact':
+      $field = array(
+        'field_name' => 'field_legal_issue_user_impact',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Impact of legal issue on a user'),
+        'description' => t('How deep is the impact to a user faced with this legal issue? Issues that impact safety and security, such as domestic violence and homelessness would rate higher on this scale than an issue related to a dog bite or the use of fireworks.'),
+        'widget' => array(
+          'type' => 'options_select',
+          'module' => 'options',
+        ),
+      );
+      break;
+
+    case 'field_existing_issue_coverage':
+      $field = array(
+        'field_name' => 'field_existing_issue_coverage',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Existing coverage on this issue'),
+        'description' => t('Indicate how much good existing content exists from partner organizations and government websites to address this legal issue?'),
+        'widget' => array(
+          'type' => 'options_select',
+          'module' => 'options',
+        ),
+      );
+      break;
+
+    case 'field_effective_date':
+      $field = array(
+        'field_name' => 'field_effective_date',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Law change effective date/grant due date'),
+        'description' => t('Enter the effective date of a legislative change, law change, or other due date where a change needs made'),
+        'widget' => array(
+          'type' => 'date_popup',
+          'module' => 'date',
+        ),
+      );
+      break;
+
+    case 'field_workload_impact':
+      $field = array(
+        'field_name' => 'field_workload_impact',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Workload impact'),
+        'description' => t('Indicate the impact of this change on workloads. Criteria may include the number of articles, the formats of the legal content affected, the amount of changes required.'),
+        'widget' => array(
+          'type' => 'options_select',
+          'module' => 'options',
+        ),
+      );
+      break;
+
+    case 'field_content_score':
+      $field = array(
+        'field_name' => 'field_content_score',
+        'entity_type' => $entity_type,
+        'bundle' => $bundle,
+        'label' => t('Content Score'),
+        'description' => t('Score of a node based on Legal Issues which are attached to a node.'),
+        'widget' => array(
+          'module' => 'text',
+          'settings' => array(
+            'size' => 60,
+          ),
+          'type' => 'text_textfield',
+          'weight' => 20,
+        ),
+        'display' => array(
+          'default' => array(
+            'label' => 'above',
+            'settings' => array(),
+            'type' => 'hidden',
+            'weight' => 0,
+          ),
+          'major_minor_comparison' => array(
+            'label' => 'above',
+            'settings' => array(),
+            'type' => 'hidden',
+            'weight' => 0,
+          ),
+          'search_index' => array(
+            'label' => 'above',
+            'settings' => array(),
+            'type' => 'hidden',
+            'weight' => 0,
+          ),
+          'teaser' => array(
+            'label' => 'above',
+            'settings' => array(),
+            'type' => 'hidden',
+            'weight' => 0,
+          ),
+        ),
+      );
+      break;
+
+  }
+
+  if (!empty($field)) {
+    field_create_instance($field);
+  }
+}
+
+/**
+ * Function to get field instance of a content type.
+ */
+function ilao_legalaid_scorecard_get_field_instance($form, &$form_state) {
+
+  $legal_content_type = $form_state['input']['ilao_legalaid_scorecard_node_type_legal_problem'];
+  $last_reviewed_date = $form_state['input']['ilao_legalaid_scorecard_last_reviewed_date'];
+  if ($last_reviewed_date) {
+    $instances = field_info_instances("node", $legal_content_type);
+    $field_instance[] = '';
+    foreach ($instances as $instance_val) {
+      $field_instance[$instance_val['field_name']] = $instance_val['label'];
+    }
+    $form['ilao_legalaid_scorecard_last_reviewed_date_field']['#options'] = $field_instance;
+    return $form['ilao_legalaid_scorecard_last_reviewed_date_field'];
+  }
+}
+
+/**
+ * Implements hook_views_pre_view().
+ */
+function ilao_legalaid_scorecard_views_pre_view(&$view, &$display_id, &$args) {
+
+  if ($view->name == 'scoreboard_report' && $view->current_display == 'page') {
+    $scorecard_content_type = variable_get('ilao_legalaid_scorecard_node_type_legal_problem', '');
+    if (!empty($scorecard_content_type)) {
+      $args[] = $scorecard_content_type;
+    }
+  }
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function ilao_legalaid_scorecard_node_presave($node) {
+
+  $content_type = variable_get('ilao_legalaid_scorecard_node_type_legal_problem', '');
+  if ($node->type == $content_type) {
+    $content_score = ilao_legalaid_scorecard_update_content_score($node);
+    $node->field_content_score[LANGUAGE_NONE][0]['value'] = $content_score;
+  }
+}
+
+/**
+ *
+ */
+function ilao_legalaid_scorecard_update_content_score($node) {
+
+  $user_impact_sum = 0;
+  $coverage_sum = 0;
+  $breadth_sum = 0;
+  $workload_sum = 0;
+
+  $user_impact_arr = array();
+  $coverage_arr = array();
+  $breadth_arr = array();
+  $workload_arr = array();
+
+  $legal_issue_count = 0;
+  $update_scheduled = 0;
+  $node_last_updated = 0;
+  $effective_time = strtotime("2100-01-01");
+
+  $ilao_legalaid_scorecard_last_reviewed_date_field = variable_get('ilao_legalaid_scorecard_last_reviewed_date_field', '');
+  $ilao_legalaid_scorecard_last_reviewed_date = variable_get('ilao_legalaid_scorecard_last_reviewed_date', '');
+  $field_legal_issues = variable_get('ilao_legalaid_scorecard_node_legal_issue_field');
+  $legal_arr = array();
+
+  $maximum_time = variable_get('ilao_legalaid_scorecard_maximum_time', '');
+  $pageviews_field = variable_get('ilao_legalaid_scorecard_page_views', '');
+
+  if (!empty($node->{$field_legal_issues}[LANGUAGE_NONE])) {
+
+
+    $legal_issue_count = count($node->{$field_legal_issues}[LANGUAGE_NONE]);
+    $created = date("Y-m-d h:i:s", $node->created);
+
+    if ($ilao_legalaid_scorecard_last_reviewed_date == 1) {
+      if (isset($node->{$ilao_legalaid_scorecard_last_reviewed_date_field}[LANGUAGE_NONE][0]['value'])) {
+        $changed = $node->{$ilao_legalaid_scorecard_last_reviewed_date_field}[LANGUAGE_NONE][0]['value'];
+      }
+      else {
+        $changed = $node->changed;
+      }
+    }
+    else {
+      $changed = date("Y-m-d h:i:s", $node->changed);
+    }
+
+    $after_30 = strtotime("-30 days");
+
+    if ($changed < $after_30) {
+      $node_last_updated = 1;
+    }
+
+    $legal_issue_count = 0;
+
+
+    foreach ($node->{$field_legal_issues}[LANGUAGE_NONE] as $legal_key => $legal_val) {
+      if (!in_array($legal_val['tid'], $legal_arr)) {
+        $legal_arr[] = $legal_val['tid'];
+      }
+      else {
+        continue;
+      }
+
+      $legal_taxonomy = taxonomy_term_load($legal_val['tid']);
+
+      if (isset($legal_taxonomy->field_effective_date[LANGUAGE_NONE][0]['value'])) {
+        $effective_date = strtotime($legal_taxonomy->field_effective_date[LANGUAGE_NONE][0]['value']);
+        $current_date = time();
+
+        // $effective_time = ($effective_time==0)?$effective_date:;.
+        if ($effective_date < $effective_time) {
+          $effective_time = $effective_date;
+        }
+
+        $update_scheduled = 1;
+
+      }
+
+      if (isset($legal_taxonomy->field_legal_issue_breadth[LANGUAGE_NONE][0]['value'])) {
+        $breadth_value = $legal_taxonomy->field_legal_issue_breadth[LANGUAGE_NONE][0]['value'];
+
+        if ($breadth_value == 1) {
+          $breadth_sum += 1;
+        }
+        elseif ($breadth_value == 2) {
+          $breadth_sum += 4;
+        }
+        elseif ($breadth_value == 3) {
+          $breadth_sum += 8;
+        }
+        $breadth_arr[$legal_val['tid']] = $breadth_value;
+        $legal_issue_count += 1;
+      }
+
+      if (isset($legal_taxonomy->field_legal_issue_user_impact[LANGUAGE_NONE][0]['value'])) {
+        $user_impact_value = $legal_taxonomy->field_legal_issue_user_impact[LANGUAGE_NONE][0]['value'];
+        $user_impact_sum += $user_impact_value;
+        $user_impact_arr[$legal_val['tid']] = $user_impact_value;
+      }
+
+      if (isset($legal_taxonomy->field_existing_issue_coverage[LANGUAGE_NONE][0]['value'])) {
+        $coverage_value = $legal_taxonomy->field_existing_issue_coverage[LANGUAGE_NONE][0]['value'];
+
+        if ($coverage_value == 3) {
+          $coverage_sum += 1;
+        }
+        elseif ($coverage_value == 2) {
+          $coverage_sum += 4;
+        }
+        elseif ($coverage_value == 1) {
+          $coverage_sum += 6;
+        }
+
+        $coverage_arr[$legal_val['tid']] = $coverage_value;
+      }
+
+      if (isset($legal_taxonomy->field_workload_impact[LANGUAGE_NONE][0]['value'])) {
+        $workload_value = $legal_taxonomy->field_workload_impact[LANGUAGE_NONE][0]['value'];
+        $workload_sum += $workload_value;
+        $workload_arr[$legal_val['tid']] = $workload_value;
+      }
+    }
+  }
+  if ($legal_issue_count == 0) {
+    drupal_set_message(t('Please enter data in your legal issue taxonomy to get useful scores'),'error');
+    $legal_issue_count = 1;
+    $workload_arr = array(0);
+  }
+  $score = ($coverage_sum + $user_impact_sum + $breadth_sum) / $legal_issue_count;
+  if (!empty($workload_arr)) {
+    $maximum_workload = max($workload_arr);
+  }
+  else {
+    $maximum_workload = 0;
+  }
+
+
+  if ($node_last_updated && $update_scheduled) {
+    $current_time = time();
+    $after_10 = strtotime("+10 days");
+    $after_30 = strtotime("+30 days");
+    $after_45 = strtotime("+45 days");
+
+    if ($effective_time < $current_time) {
+      $score += 10;
+    }
+    elseif ($effective_time < $after_10 && $effective_time > $current_time) {
+      $score += 8;
+    }
+    elseif (($effective_time < $after_30) && ($effective_time > $current_time) && ($maximum_workload == 3)) {
+      $score += 8;
+    }
+    elseif (($effective_time < $after_30) && ($effective_time > $current_time) && ($maximum_workload == 2)) {
+      $score += 5;
+    }
+    elseif (($effective_time < $after_45) && ($effective_time > $current_time) && ($maximum_workload == 2 || $maximum_workload == 3)) {
+      $score += 3;
+    }
+    elseif (($effective_time < $after_30) && ($effective_time > $current_time) && ($maximum_workload == 1)) {
+      $score += 3;
+    }
+    elseif (($effective_time < $after_45) && ($effective_time > $current_time) && ($maximum_workload == 1)) {
+      $score += 1;
+    }
+    else {
+      $score += 0;
+    }
+  }
+  else {
+
+    if ($effective_time == strtotime("2100-01-01") || ($node->changed <= strtotime("+30 days", $effective_time)) && $node->changed >= $effective_time) {
+
+      $last_reviewed_date_field = variable_get('ilao_legalaid_scorecard_last_reviewed_date_field', '');
+      $last_reviewed_date_flag = variable_get('ilao_legalaid_scorecard_last_reviewed_date', 0);
+      $scorecard_max_time = variable_get('ilao_legalaid_scorecard_maximum_time', '');
+
+      $percent_80 = $scorecard_max_time * 0.8;
+      $percent_50 = $scorecard_max_time * 0.5;
+
+      if ($last_reviewed_date_flag == 1) {
+        if (isset($node->original)) {
+          $last_updated_date = $node->original->{$last_reviewed_date_field}[LANGUAGE_NONE][0]['value'];
+        }
+        else {
+          $last_updated_date = $node->{$last_reviewed_date_field}[LANGUAGE_NONE][0]['value'];
+        }
+      }
+      else {
+        $last_updated_date = date("Y-m-d h:i:s", $node->changed);
+      }
+
+      $last_updated_date = new DateTime($last_updated_date);
+      $now = new DateTime();
+
+      $sinceThen = $last_updated_date->diff($now);
+
+      if ($sinceThen->m >= $scorecard_max_time) {
+        $score += 10;
+      }
+      elseif ($sinceThen->m >= $percent_80) {
+        $score += 8;
+      }
+      elseif ($sinceThen->m < $percent_80 && $sinceThen->m >= $percent_50) {
+        $score += 5;
+      }
+      else {
+        $score += 0;
+      }
+
+    }
+
+  }
+
+  $actual_score = $score;
+
+  // Get Actual Score based on Fivestar Ratings.
+  if (module_exists('fivestar')) {
+    $fivestar_field = variable_get('ilao_legalaid_scorecard_field_for_ratings', '');
+
+    if (isset($node->original->{$fivestar_field}[LANGUAGE_NONE][0]['rating'])) {
+      $fivestar_value = $node->original->{$fivestar_field}[LANGUAGE_NONE][0]['rating'];
+      $actual_score += (5 - $fivestar_value);
+    }
+    elseif (isset($node->{$fivestar_field}[LANGUAGE_NONE][0]['rating'])) {
+      $fivestar_value = $node->{$fivestar_field}[LANGUAGE_NONE][0]['rating'];
+      $actual_score += (5 - $fivestar_value);
+    }
+    else {
+      $actual_score += 0;
+    }
+  }
+
+  // Get Actual Score based on Google Analytics Reports.
+  if (module_exists('google_analytics_reports')) {
+
+    $max_page_views = db_query("SELECT MAX(field_pageviews_value) as max_field_pagesviews FROM field_data_field_pageviews ")->fetchCol();
+    $max_page_views = $max_page_views[0];
+    if (isset($node->{$pageviews_field}[LANGUAGE_NONE][0]['value'])) {
+      $pageviews_value = $node->{$pageviews_field}[LANGUAGE_NONE][0]['value'];
+      $pageviews_percent = floor((($max_page_views - $pageviews_value) / $max_page_views) * 100);
+      if ($pageviews_percent <= 10) {
+        $actual_score += 5;
+      }
+      elseif ($pageviews_percent <= 25 && $pageviews_percent > 10) {
+        $actual_score += 4;
+      }
+      elseif ($pageviews_percent <= 40 && $pageviews_percent > 26) {
+        $actual_score += 3;
+      }
+      elseif ($pageviews_percent <= 60 && $pageviews_percent > 41) {
+        $actual_score += 2;
+      }
+      else {
+        $actual_score += 0;
+      }
+
+    }
+
+  }
+
+  $actual_score = floor($actual_score);
+  $score = floor($score);
+
+  // Last Condition for finding content score.
+  if ($actual_score <= 43) {
+    if ($score >= 36) {
+      $content_score = 5;
+    }
+    elseif ($score >= 26 && $score <= 35) {
+      $content_score = 4;
+    }
+    elseif ($score >= 19 && $score <= 25) {
+      $content_score = 3;
+    }
+    elseif ($score >= 11 && $score <= 18) {
+      $content_score = 2;
+    }
+    else {
+      $content_score = 1;
+    }
+  }
+  elseif ($actual_score > 43 && $actual_score <= 48) {
+    if ($score >= 44) {
+      $content_score = 5;
+    }
+    elseif ($score >= 34 && $score <= 43) {
+      $content_score = 4;
+    }
+    elseif ($score >= 24 && $score <= 33) {
+      $content_score = 3;
+    }
+    elseif ($score >= 11 && $score <= 24) {
+      $content_score = 2;
+    }
+    else {
+      $content_score = 1;
+    }
+  }
+  elseif ($actual_score > 48 && $actual_score <= 53) {
+    if ($score >= 49) {
+      $content_score = 5;
+    }
+    elseif ($score >= 39 && $score <= 48) {
+      $content_score = 4;
+    }
+    elseif ($score >= 29 && $score <= 38) {
+      $content_score = 3;
+    }
+    elseif ($score >= 15 && $score <= 28) {
+      $content_score = 2;
+    }
+    else {
+      $content_score = 1;
+    }
+  }
+  return $content_score;
+}
+
+/**
+ * Implements hook_cron().
+ */
+function ilao_legalaid_scorecard_cron() {
+
+  $type = variable_get('ilao_legalaid_scorecard_node_type_legal_problem', '');
+  if (!empty($type)) {
+    $result = db_query("SELECT nid FROM node WHERE type=:type", array(':type' => $type))->fetchAll();
+    $queue = DrupalQueue::get('update_scorecard');
+    foreach ($result as $result_key => $result_val) {
+      $queue->createItem($result_val);
+    }
+  }
+
+}
+
+/**
+ * Implements hook_cron_queue_info().
+ */
+function ilao_legalaid_scorecard_cron_queue_info() {
+  $queues['update_scorecard'] = array(
+    'worker callback' => 'ilao_legalaid_scorecard_content_score_worker_callback',
+    'time' => 120,
+  );
+  return $queues;
+}
+
+/**
+ * Implementation of worker callback for content score queue.
+ */
+function ilao_legalaid_scorecard_content_score_worker_callback($data) {
+  $node = node_load($data->nid);
+  $content_score = ilao_legalaid_scorecard_update_content_score($node);
+  $node->field_content_score[LANGUAGE_NONE][0]['value'] = $content_score;
+  node_save($node);
+}

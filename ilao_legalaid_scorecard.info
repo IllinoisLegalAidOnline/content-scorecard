@@ -1,0 +1,9 @@
+name =  ILAO Legal Aid Scorecard
+description = Holds the code related to the Content scorecard
+package = ILAO
+version = 7.x-1.0
+core = 7.x
+dependencies[] = views
+dependencies[] = date
+dependencies[] = locale
+files[] = ilao_legalaid_scorecard.admin.inc
